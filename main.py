@@ -1,5 +1,6 @@
 import pygame
 import sys
+import os
 from player import Player
 from level import Level
 from enemy import Enemy
@@ -22,9 +23,16 @@ RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 
 class Game:
-    def __init__(self):
-        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("🎮 Mario Game - Python Edition")
+    def __init__(self, headless=False):
+        self.headless = headless or os.environ.get('SDL_VIDEODRIVER') == 'dummy'
+        
+        if not self.headless:
+            self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+            pygame.display.set_caption("🎮 Mario Game - Python Edition")
+        else:
+            self.screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            print("🎮 Mode headless activé - Jeu en cours d'exécution...")
+        
         self.clock = pygame.time.Clock()
         self.running = True
         self.paused = False
@@ -34,6 +42,8 @@ class Game:
         self.score = 0
         self.game_over = False
         self.level_complete = False
+        self.frame_count = 0
+        self.max_frames = 300  # Limite de frames en mode headless
         
         # Initialiser le jeu
         self.init_level()
@@ -67,8 +77,16 @@ class Game:
             return
         
         # Entrée du joueur
-        keys = pygame.key.get_pressed()
-        self.player.handle_input(keys)
+        if not self.headless:
+            keys = pygame.key.get_pressed()
+            self.player.handle_input(keys)
+        else:
+            # En mode headless, faire des actions aléatoires
+            import random
+            if random.random() > 0.7:
+                self.player.vel_x = random.choice([-5, 0, 5])
+            if random.random() > 0.8:
+                self.player.vel_y = -12
         
         # Mise à jour du joueur
         if not self.player.update(self.level.get_platforms(), SCREEN_WIDTH, SCREEN_HEIGHT):
@@ -148,7 +166,8 @@ class Game:
         elif self.level_complete:
             self.draw_level_complete_screen()
         
-        pygame.display.flip()
+        if not self.headless:
+            pygame.display.flip()
     
     def draw_ui(self):
         """Dessine l'interface utilisateur"""
@@ -229,14 +248,35 @@ class Game:
     def run(self):
         """Boucle principale du jeu"""
         while self.running:
-            self.handle_events()
+            if not self.headless:
+                self.handle_events()
+            
             self.update()
             self.draw()
             self.clock.tick(FPS)
+            
+            # En mode headless, afficher la progression
+            if self.headless:
+                self.frame_count += 1
+                if self.frame_count % 60 == 0:  # Afficher tous les 60 frames (1 seconde)
+                    print(f"⏱️  Frame {self.frame_count}/{self.max_frames} - Score: {self.score} - Niveau: {self.current_level}")
+                
+                # Arrêter après max_frames en mode headless
+                if self.frame_count >= self.max_frames:
+                    print(f"✅ Test complété avec succès!")
+                    print(f"📊 Score final: {self.score}")
+                    print(f"🎮 Niveau atteint: {self.current_level}")
+                    self.running = False
         
         pygame.quit()
-        sys.exit()
+        if not self.headless:
+            sys.exit()
 
 if __name__ == "__main__":
-    game = Game()
+    headless_mode = "--headless" in sys.argv or os.environ.get('SDL_VIDEODRIVER') == 'dummy'
+    
+    if headless_mode:
+        print("✅ Démarrage du test en mode headless...")
+    
+    game = Game(headless=headless_mode)
     game.run()
